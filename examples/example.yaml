@@ -1,0 +1,10 @@
+title: Hacker News front page smoke test
+platform: web
+projectUrl: https://news.ycombinator.com
+steps:
+  - type: act
+    title: Open Hacker News
+  - type: screenshot
+    title: Capture front page
+  - type: assert
+    title: The page contains the word "Hacker News" in its heading
