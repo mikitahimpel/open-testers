@@ -1,0 +1,62 @@
+name: live
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * *"
+
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
+
+      - name: Check for API key
+        id: check
+        env:
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$API_KEY" ]; then
+            echo "ANTHROPIC_API_KEY secret is not set — skipping live test."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "API key present — proceeding."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run live test against example.com (Claude)
+        if: steps.check.outputs.skip != 'true'
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPEN_TESTERS_LLM: claude
+        run: open-testers run examples/live-example.yaml --output ./live-runs
+
+      - name: Verify result
+        if: steps.check.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          RUN_DIR=$(ls -1d ./live-runs/*/ | head -1)
+          echo "Run dir: $RUN_DIR"
+          python -c "import json,sys; d=json.load(open('$RUN_DIR/trace.json')); print('status:',d['status'],'steps:',len(d['steps'])); sys.exit(0 if d['status']=='pass' else 1)"
+
+      - name: Upload run artifacts
+        if: always() && steps.check.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-run
+          path: live-runs/
+          retention-days: 14

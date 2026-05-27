@@ -1,0 +1,10 @@
+title: example.com live smoke test
+platform: web
+projectUrl: https://example.com
+steps:
+  - type: act
+    title: Wait for the page to finish loading
+  - type: screenshot
+    title: Capture the landing page
+  - type: assert
+    title: The page heading contains the text "Example Domain"
