@@ -330,7 +330,8 @@ def memory_list(memory_file: Path) -> None:
         return
     for m in entries:
         console.print(
-            f"{m.id}  [{m.importance}]  {m.category}  {m.title}"
+            f"{m.id}  [{m.importance}]  {m.category}  {m.title}",
+            markup=False,
         )
 
 
