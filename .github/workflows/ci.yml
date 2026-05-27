@@ -1,0 +1,48 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+
+      - name: Install Playwright Chromium
+        run: playwright install --with-deps chromium
+
+      - name: Run example with stub LLM
+        run: open-testers run examples/example.yaml --dry-run --output ./ci-runs
+
+      - name: Verify artifacts
+        run: |
+          set -euo pipefail
+          RUN_DIR=$(ls -1d ./ci-runs/*/ | head -1)
+          echo "Run dir: $RUN_DIR"
+          test -s "$RUN_DIR/video.webm"        || (echo "video missing/empty" && exit 1)
+          test -s "$RUN_DIR/trace.json"        || (echo "trace missing/empty" && exit 1)
+          test -d "$RUN_DIR/screenshots"       || (echo "screenshots dir missing" && exit 1)
+          test -n "$(ls -A "$RUN_DIR/screenshots")" || (echo "screenshots empty" && exit 1)
+          python -c "import json,sys; d=json.load(open('$RUN_DIR/trace.json')); print('status:',d['status'],'steps:',len(d['steps'])); sys.exit(0 if d['status']=='pass' else 1)"
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-runs
+          path: ci-runs/
+          retention-days: 7
